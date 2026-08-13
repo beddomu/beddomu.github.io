@@ -1,0 +1,62 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Tesla — returning to the dashboard</title>
+<style>
+  body { font: 16px/1.6 -apple-system, system-ui, sans-serif; background:#0a0b0d; color:#f2f5f9;
+         display:grid; place-items:center; min-height:100vh; margin:0; text-align:center; padding:2rem }
+  code { background:#16191e; padding:.4em .7em; border-radius:8px; display:inline-block;
+         word-break:break-all; max-width:min(70ch,90vw); color:#4a9eff; font-size:14px }
+  .muted { color:#8b95a3; font-size:14px }
+  button { font:inherit; background:#4a9eff; color:#05070a; border:0; border-radius:10px;
+           padding:.6em 1.2em; cursor:pointer; font-weight:600 }
+</style>
+<div>
+  <h1 id="title">Signed in</h1>
+  <p id="msg">Returning you to the dashboard…</p>
+  <p><code id="out"></code></p>
+  <p id="hint" class="muted"></p>
+</div>
+<script>
+/* Tesla only redirects to a registered HTTPS address, and it can't reach a LAN
+   address — so this page catches the authorisation code and forwards it on. A
+   top-level navigation to http:// is allowed from an https:// page (a fetch
+   would not be).
+
+   The dashboard's address is NOT written into this file: this repository is
+   public, and there's no reason to publish a private network address. It is
+   stored in this browser once, by visiting
+       https://beddomu.github.io/callback/?dashboard=http://<host>:3006
+   and read back from localStorage on every subsequent sign-in. */
+const KEY = 'dashboard-url';
+const q = new URLSearchParams(location.search);
+const out = document.getElementById('out');
+const msg = document.getElementById('msg');
+const hint = document.getElementById('hint');
+
+const setup = q.get('dashboard');
+if (setup) {
+  localStorage.setItem(KEY, setup.replace(/\/$/, ''));
+  document.getElementById('title').textContent = 'Ready';
+  msg.textContent = 'This browser will now send Tesla sign-ins to:';
+  out.textContent = localStorage.getItem(KEY);
+  hint.textContent = 'You only need to do this once. Now start the sign-in from the dashboard.';
+} else {
+  const code = q.get('code');
+  const dash = localStorage.getItem(KEY);
+  out.textContent = code || q.get('error_description') || q.get('error') || 'no code returned';
+
+  if (code && dash) {
+    const url = `${dash}/api/tesla/fleet/callback?code=${encodeURIComponent(code)}`
+              + `&state=${encodeURIComponent(q.get('state') || '')}`;
+    hint.textContent = 'If nothing happens, copy the code above into the dashboard.';
+    setTimeout(() => { location.href = url; }, 600);
+  } else if (code) {
+    msg.textContent = 'Copy this code into the dashboard:';
+    hint.textContent = 'This browser does not know your dashboard address yet — '
+                     + 'visit this page once with ?dashboard=http://<host>:3006 to set it.';
+  } else {
+    document.getElementById('title').textContent = 'Sign-in failed';
+    msg.textContent = 'Tesla did not return an authorisation code.';
+  }
+}
+</script>
